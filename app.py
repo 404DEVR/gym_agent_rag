@@ -12,6 +12,19 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = FastAPI(title="AI Fitness & Diet Coach API", description="Personalized meal and workout plans using RAG + Gemini AI")
 
+@app.get("/")
+def root():
+    """Root endpoint"""
+    return {
+        "message": "AI Fitness & Diet Coach API is running!",
+        "endpoints": {
+            "health": "/api/health",
+            "generate_plan": "/api/generate-plan",
+            "chat": "/chat",
+            "test_scenarios": "/api/test-scenarios"
+        }
+    }
+
 # Add CORS middleware for Next.js frontend
 # CORS configuration for production
 allowed_origins = [
@@ -67,22 +80,37 @@ def get_plan(user: UserData):
 @app.get("/api/health")
 def health_check():
     """Health check endpoint"""
+    import os
+    
+    health_status = {
+        "status": "healthy",
+        "timestamp": str(os.popen('date').read().strip()) if os.name != 'nt' else "unknown",
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "port": os.getenv("PORT", "8000"),
+        "indexes_loaded": False,
+        "data_directory_exists": os.path.exists("data"),
+        "files_in_data": []
+    }
+    
     try:
-        # Check if indexes are loaded
-        from retriever import workout_index, nutrition_index
-        indexes_loaded = workout_index is not None and nutrition_index is not None
+        # Check data directory contents
+        if os.path.exists("data"):
+            health_status["files_in_data"] = os.listdir("data")
         
-        return {
-            "status": "healthy",
-            "indexes_loaded": indexes_loaded,
-            "environment": os.getenv("ENVIRONMENT", "development")
-        }
+        # Check if indexes are loaded (with fallback)
+        try:
+            from retriever import workout_index, nutrition_index
+            health_status["indexes_loaded"] = workout_index is not None and nutrition_index is not None
+        except Exception as idx_error:
+            health_status["index_error"] = str(idx_error)
+            health_status["indexes_loaded"] = False
+        
+        return health_status
+        
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "environment": os.getenv("ENVIRONMENT", "development")
-        }
+        health_status["status"] = "unhealthy"
+        health_status["error"] = str(e)
+        return health_status
 
 @app.post("/chat")
 def chat_with_agent(chat_message: ChatMessage):
