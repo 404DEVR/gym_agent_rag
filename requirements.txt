@@ -1,0 +1,11 @@
+pandas
+faiss-cpu
+google-generativeai
+numpy
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+PyMuPDF
+requests
+gunicorn 
