@@ -36,16 +36,27 @@ allowed_origins = [
 if os.getenv("FRONTEND_URL"):
     allowed_origins.append(os.getenv("FRONTEND_URL"))
 
+# Add your deployed frontend URL
+allowed_origins.extend([
+    "https://gym-chatbot-404devr.vercel.app",  # Your Vercel deployment
+    "https://gym-agent-six.vercel.app",  # Your current Vercel deployment
+    "https://*.vercel.app",  # Any Vercel preview deployments
+])
+
 # For development, allow all origins
 if os.getenv("ENVIRONMENT") == "development":
     allowed_origins = ["*"]
+
+# Allow all origins for production (temporary fix)
+allowed_origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 class UserData(BaseModel):
