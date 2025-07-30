@@ -126,44 +126,135 @@ def health_check():
 @app.post("/chat")
 def chat_with_agent(chat_message: ChatMessage):
     """Chat endpoint for conversational interactions with the fitness agent"""
+    from cache_manager import ResponseCache
+    from fallback_responses import FallbackResponseSystem
+    from macros import MacroCalculator
+    
+    # Initialize systems
+    cache = ResponseCache()
+    fallback = FallbackResponseSystem()
+    calculator = MacroCalculator()
+    
     try:
-        user_message = chat_message.message.lower()
+        user_message = chat_message.message.strip()
         
-        # Get relevant information from RAG based on the message
-        workout_info = retrieve_workouts(chat_message.message)
-        nutrition_info = retrieve_nutrition(chat_message.message)
+        # Step 1: Check cache first
+        cached_response = cache.get_cached_response(user_message)
+        if cached_response:
+            return {"response": cached_response}
         
-        # Create a context-aware prompt for the chat
+        # Step 2: Handle simple greetings without API
+        if fallback.is_greeting(user_message):
+            response = fallback.get_greeting_response()
+            cache.cache_response(user_message, response)
+            return {"response": response}
+        
+        # Step 3: Try macro calculator (no API needed)
+        calc_response = calculator.generate_response(user_message)
+        if calc_response:
+            cache.cache_response(user_message, calc_response)
+            return {"response": calc_response}
+        
+        # Step 4: Check if we should use API or fallback
+        should_use_api = _should_use_api(user_message)
+        
+        if not should_use_api:
+            # Use fallback response
+            response = fallback.get_fallback_response(user_message)
+            cache.cache_response(user_message, response)
+            return {"response": response}
+        
+        # Step 5: Use API with RAG (only when necessary)
+        workout_info = retrieve_workouts(user_message)
+        nutrition_info = retrieve_nutrition(user_message)
+        
+        # Only proceed with API if we have relevant RAG data
+        if not workout_info and not nutrition_info:
+            response = fallback.get_fallback_response(user_message)
+            cache.cache_response(user_message, response)
+            return {"response": response}
+        
+        # Create a more focused prompt to reduce token usage
         prompt = f"""
-You are an expert AI fitness coach and nutritionist. You have access to research-based information about fitness and nutrition.
+You are a fitness coach. Answer briefly and practically.
 
-User Question: {chat_message.message}
+Question: {user_message}
 
-Relevant Workout Information:
-{' '.join(workout_info[:2])}
+Context: {' '.join(workout_info[:1])} {' '.join(nutrition_info[:1])}
 
-Relevant Nutrition Information:
-{' '.join(nutrition_info[:2])}
-
-Instructions:
-1. Answer the user's question directly and helpfully
-2. Use the provided research information when relevant
-3. If the user is asking for a personalized plan, ask them for their details (age, weight, height, goal, etc.)
-4. Keep responses conversational but informative
-5. If you need more information to give a proper answer, ask specific questions
-6. Be encouraging and supportive
-7. If the question is not fitness/nutrition related, politely redirect to fitness topics
-
-Provide a helpful, accurate response based on the research information available.
+Provide a concise, helpful answer (max 150 words).
 """
         
         model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(prompt)
         
-        return {"response": response.text}
+        # Cache the API response
+        api_response = response.text
+        cache.cache_response(user_message, api_response)
+        
+        return {"response": api_response}
         
     except Exception as e:
-        return {"response": f"I'm sorry, I'm having trouble processing your request right now. Error: {str(e)}"}
+        error_message = str(e)
+        
+        # Handle specific API quota exceeded error
+        if "429" in error_message and "quota" in error_message.lower():
+            friendly_message = """
+🤖 **Oops! I've reached my daily limit** 
+
+I'm sorry, but I've used up all my AI credits for today! 😅 
+
+**Please try again in 24 hours** - my credits will refresh and I'll be ready to help you with your fitness journey again!
+
+In the meantime, here are some general tips:
+• Stay hydrated 💧
+• Get enough sleep (7-9 hours) 😴
+• Take a walk or do some light stretching 🚶‍♂️
+• Plan your meals ahead 🥗
+
+Thank you for your patience! 🙏
+            """.strip()
+            return {"response": friendly_message}
+        
+        # Handle other API errors - use fallback instead of error
+        elif "429" in error_message:
+            response = fallback.get_fallback_response(user_message)
+            return {"response": response}
+        
+        # Handle general errors with fallback
+        else:
+            response = fallback.get_fallback_response(user_message)
+            return {"response": response}
+
+def _should_use_api(message: str) -> bool:
+    """Determine if we should use the API or fallback response"""
+    message_lower = message.lower()
+    
+    # Use API for complex questions that need personalized responses
+    api_triggers = [
+        'personalized', 'custom', 'specific', 'my situation', 'my case',
+        'calculate', 'how much', 'how many', 'what should i',
+        'plan for me', 'help me create', 'design a plan'
+    ]
+    
+    # Don't use API for simple questions
+    simple_patterns = [
+        'what is', 'define', 'explain', 'tell me about',
+        'benefits of', 'why', 'how does', 'what are'
+    ]
+    
+    # Check for API triggers
+    for trigger in api_triggers:
+        if trigger in message_lower:
+            return True
+    
+    # Check for simple patterns
+    for pattern in simple_patterns:
+        if pattern in message_lower:
+            return False
+    
+    # Default to fallback for shorter messages
+    return len(message.split()) > 8
 
 @app.post("/api/test-scenarios")
 def test_scenarios():
