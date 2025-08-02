@@ -11,6 +11,8 @@ from retriever import retrieve_workouts, retrieve_nutrition
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
+# Old extraction functions removed - now using AI-generated JSON directly
+
 def _extract_user_context(user_message):
     """Extract user context from message to personalize nutrition planning"""
     message_lower = user_message.lower()
@@ -76,6 +78,7 @@ def root():
         "endpoints": {
             "health": "/api/health",
             "generate_plan": "/api/generate-plan",
+            "meal_plan": "/meal-plan",
             "chat": "/chat",
             "test_scenarios": "/api/test-scenarios"
         }
@@ -134,6 +137,12 @@ class UserData(BaseModel):
 
 class ChatMessage(BaseModel):
     message: str
+
+class MealPlanRequest(BaseModel):
+    goal: str
+    ingredients: list
+    dietary_restrictions: list = []
+    target_calories: int = None
 
 @app.post("/api/generate-plan")
 def get_plan(user: UserData):
@@ -241,11 +250,7 @@ def chat_with_agent(chat_message: ChatMessage):
         # Only handle greetings locally - everything else goes to API
         if fallback.is_greeting(user_message):
             response = fallback.get_greeting_response()
-            print(f"Greeting response - Response time: {time.time() - start_time:.2f}s")
             return {"response": response}
-        
-        # All other messages go directly to API for better personalized responses
-        print(f"Using API for: {user_message[:50]}...")
         
         # Check if this is a personal request with details
         has_personal_details = any(re.search(pattern, user_message.lower()) for pattern in [
@@ -265,9 +270,8 @@ def chat_with_agent(chat_message: ChatMessage):
         try:
             workout_info = retrieve_workouts(user_message)[:2]
             nutrition_info = retrieve_nutrition(user_message)[:2]
-            print(f"Retrieved RAG data - Workout: {len(workout_info)} items, Nutrition: {len(nutrition_info)} items")
         except Exception as e:
-            print(f"RAG retrieval error: {e}")
+            pass
         
         # Extract user context for personalized nutrition planning
         user_context = _extract_user_context(user_message)
@@ -344,18 +348,63 @@ Create a detailed, personalized plan that includes:
    - Sets, reps, and weekly schedule
    - Progression strategy over 4-8 weeks
 
-4. **LIFESTYLE INTEGRATION**:
-   - How to fit meals into their daily schedule
-   - Budget optimization (cost per meal breakdown)
-   - Time-saving strategies
-   - Social eating management
+CRITICAL REQUIREMENTS:
+- Make it extremely practical and actionable
+- Provide exact foods, quantities, preparation methods
+- Include only information that's directly useful to the user
+- Do NOT include any internal notes, comments, or meta-information
+- Format the response clearly with proper sections and bullet points
+- End the response naturally without any trailing notes
 
-5. **PROGRESS TRACKING**:
-   - How to track calories and macros (app recommendations)
-   - Weekly measurement schedule
-   - When and how to adjust the plan
+IMPORTANT: If your response contains a WORKOUT PLAN, include this JSON structure at the end:
+<WORKOUT_JSON>
+{{
+  "goal": "user's fitness goal (e.g., build muscle, lose weight, strength, endurance)",
+  "split": ["day 1", "day 2", "day 3"] or ["monday", "tuesday", "wednesday"] or ["upper body", "lower body"] or ["full body"],
+  "days": number_of_workout_days,
+  "exercises": [
+    {{
+      "day": "day 1" or "monday" or "upper body" or "full body",
+      "exercises": [
+        {{"name": "Exercise name", "sets": 3, "reps": "8-12", "rest": "60-90s"}},
+        {{"name": "Another exercise", "sets": 3, "reps": "10-15", "rest": "45-60s", "notes": "Optional notes like 'per arm' or 'slow tempo'"}}
+      ]
+    }},
+    {{
+      "day": "day 2" or "tuesday" or "lower body",
+      "exercises": [
+        {{"name": "Exercise name", "sets": 4, "reps": "6-8", "rest": "90-120s"}},
+        {{"name": "Another exercise", "sets": 3, "reps": "AMRAP", "rest": "60s", "notes": "As many reps as possible"}}
+      ]
+    }}
+  ]
+}}
+</WORKOUT_JSON>
 
-CRITICAL: Make it extremely practical and actionable. Provide exact foods, quantities, preparation methods, and costs they can implement immediately in their specific situation.
+ADAPT THE STRUCTURE TO THE WORKOUT TYPE:
+- For Push/Pull/Legs: use "monday (push)", "tuesday (pull)", "wednesday (legs)"
+- For Upper/Lower: use "day 1 (upper)", "day 2 (lower)"
+- For Full Body: use "day 1", "day 2", "day 3" or "monday", "wednesday", "friday"
+- For Body Part Split: use "chest/triceps", "back/biceps", "legs", "shoulders"
+- For Beginner: use "workout a", "workout b" or "day 1", "day 2"
+- For Calisthenics: use descriptive names like "push movements", "pull movements", "leg movements"
+
+IMPORTANT: If your response contains a NUTRITION PLAN, include this JSON structure at the end:
+<NUTRITION_JSON>
+{{
+  "goal": "build muscle/lose weight/maintain",
+  "ingredients": ["chicken", "rice", "broccoli", "eggs"],
+  "target_calories": 2800,
+  "dietary_restrictions": [],
+  "meals": [
+    {{"type": "breakfast", "description": "Greek yogurt with berries and nuts"}},
+    {{"type": "lunch", "description": "Chicken rice bowl with vegetables"}},
+    {{"type": "dinner", "description": "Salmon with quinoa and broccoli"}}
+  ]
+}}
+</NUTRITION_JSON>
+
+Respond with a complete, well-formatted plan that the user can follow immediately.
 """
         elif is_plan_request:
             # Plan request without personal details
@@ -391,11 +440,11 @@ Provide a comprehensive, actionable answer. Include specific tips, examples, and
             
             # Adjust token limit based on request type
             if has_personal_details and is_plan_request:
-                max_tokens = 800  # More tokens for detailed personal plans
+                max_tokens = 2000  # Much more tokens for detailed personal plans
             elif is_plan_request:
-                max_tokens = 500  # Medium tokens for general plans
+                max_tokens = 1500  # More tokens for general plans
             else:
-                max_tokens = 300  # More tokens for detailed answers to simple questions
+                max_tokens = 800   # More tokens for detailed answers to simple questions
             
             response = model.generate_content(
                 prompt,
@@ -406,8 +455,65 @@ Provide a comprehensive, actionable answer. Include specific tips, examples, and
             )
             
             api_response = response.text
-            print(f"API response - Response time: {time.time() - start_time:.2f}s")
-            return {"response": api_response}
+            
+            # Clean up the response to remove any unwanted text
+            api_response = api_response.strip()
+            
+            # Remove any trailing notes or meta-information
+            unwanted_phrases = [
+                "dont need to show these",
+                "don't need to show these",
+                "internal note",
+                "meta-information",
+                "for internal use",
+                "not for user"
+            ]
+            
+            for phrase in unwanted_phrases:
+                if phrase in api_response.lower():
+                    # Find the position and truncate before it
+                    pos = api_response.lower().find(phrase)
+                    if pos > 100:  # Only truncate if there's substantial content before
+                        api_response = api_response[:pos].strip()
+                        break
+            
+            # Extract JSON structures from AI response if present
+            workout_plan_data = None
+            nutrition_plan_data = None
+            
+            # Look for workout JSON in the response
+            workout_json_match = re.search(r'<WORKOUT_JSON>\s*(\{.*?\})\s*</WORKOUT_JSON>', api_response, re.DOTALL)
+            if workout_json_match:
+                try:
+                    import json
+                    workout_plan_data = json.loads(workout_json_match.group(1))
+                    # Remove the JSON from the response text
+                    api_response = re.sub(r'<WORKOUT_JSON>.*?</WORKOUT_JSON>', '', api_response, flags=re.DOTALL).strip()
+                except json.JSONDecodeError:
+                    print("Failed to parse workout JSON from AI response")
+            
+            # Look for nutrition JSON in the response
+            nutrition_json_match = re.search(r'<NUTRITION_JSON>\s*(\{.*?\})\s*</NUTRITION_JSON>', api_response, re.DOTALL)
+            if nutrition_json_match:
+                try:
+                    import json
+                    nutrition_plan_data = json.loads(nutrition_json_match.group(1))
+                    # Remove the JSON from the response text
+                    api_response = re.sub(r'<NUTRITION_JSON>.*?</NUTRITION_JSON>', '', api_response, flags=re.DOTALL).strip()
+                except json.JSONDecodeError:
+                    print("Failed to parse nutrition JSON from AI response")
+            
+            # No fallback extraction needed - AI should generate JSON directly
+            
+            response_data = {"response": api_response}
+            
+            if workout_plan_data:
+                response_data["workout_plan"] = workout_plan_data
+                
+            if nutrition_plan_data:
+                response_data["nutrition_plan"] = nutrition_plan_data
+                
+            return response_data
             
         except Exception as api_error:
             print(f"API error: {api_error}")
@@ -468,6 +574,137 @@ Thank you for your patience! 🙏
             return {"response": response}
 
 
+
+@app.post("/meal-plan")
+def generate_meal_plan(request: MealPlanRequest):
+    """Generate a meal plan using AI based on goal and ingredients"""
+    try:
+        # Get RAG nutrition data for context
+        nutrition_context = []
+        try:
+            nutrition_context = retrieve_nutrition(f"{request.goal} nutrition meal planning")[:2]
+        except Exception as e:
+            print(f"RAG retrieval error: {e}")
+        
+        # Create prompt for meal plan generation
+        dietary_restrictions_text = ""
+        if request.dietary_restrictions:
+            dietary_restrictions_text = f"Dietary Restrictions: {', '.join(request.dietary_restrictions)}"
+        
+        target_calories_text = ""
+        if request.target_calories:
+            target_calories_text = f"Target Daily Calories: {request.target_calories}"
+        
+        prompt = f"""
+You are a professional nutritionist and chef. Create a detailed daily meal plan based on:
+
+Goal: {request.goal}
+Available Ingredients: {', '.join(request.ingredients)}
+{dietary_restrictions_text}
+{target_calories_text}
+
+Nutrition Context: {' '.join(nutrition_context)}
+
+Provide a JSON response with this exact structure:
+{{
+  "goal": "{request.goal}",
+  "ingredients": {request.ingredients},
+  "meals": [
+    {{
+      "name": "Meal name",
+      "type": "breakfast",
+      "calories": 400,
+      "protein": 25,
+      "carbs": 45,
+      "fat": 15,
+      "steps": ["Step 1", "Step 2", "Step 3"]
+    }}
+  ]
+}}
+
+Requirements:
+- Create 3-4 meals (breakfast, lunch, dinner, optional snack)
+- Use primarily the provided ingredients
+- Align meals with the fitness goal
+- Respect dietary restrictions
+- Provide realistic macro calculations
+- Include detailed cooking steps
+- Make total calories appropriate for the goal
+
+Respond ONLY with valid JSON, no additional text.
+"""
+        
+        # Generate meal plan using Gemini
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=1500,
+                temperature=0.7,
+            )
+        )
+        
+        # Clean and parse the response
+        generated_text = response.text.strip()
+        if generated_text.startswith('```json'):
+            generated_text = generated_text.replace('```json\n', '').replace('\n```', '')
+        if generated_text.startswith('```'):
+            generated_text = generated_text.replace('```\n', '').replace('\n```', '')
+        
+        import json
+        meal_plan = json.loads(generated_text)
+        
+        return {"mealPlan": meal_plan}
+        
+    except Exception as e:
+        print(f"Error generating meal plan: {e}")
+        # Return a simple fallback meal plan
+        fallback_plan = {
+            "goal": request.goal,
+            "ingredients": request.ingredients,
+            "meals": [
+                {
+                    "name": "Simple Breakfast",
+                    "type": "breakfast",
+                    "calories": 350,
+                    "protein": 20,
+                    "carbs": 40,
+                    "fat": 12,
+                    "steps": [
+                        f"Use available ingredients: {', '.join(request.ingredients[:3])}",
+                        "Combine ingredients in a balanced way",
+                        "Cook or prepare as needed"
+                    ]
+                },
+                {
+                    "name": "Balanced Lunch",
+                    "type": "lunch",
+                    "calories": 450,
+                    "protein": 30,
+                    "carbs": 45,
+                    "fat": 15,
+                    "steps": [
+                        f"Prepare main ingredients: {', '.join(request.ingredients[:2])}",
+                        "Add vegetables if available",
+                        "Season and cook thoroughly"
+                    ]
+                },
+                {
+                    "name": "Nutritious Dinner",
+                    "type": "dinner",
+                    "calories": 500,
+                    "protein": 35,
+                    "carbs": 50,
+                    "fat": 18,
+                    "steps": [
+                        f"Use protein source from: {', '.join(request.ingredients)}",
+                        "Add complex carbohydrates",
+                        "Include healthy fats"
+                    ]
+                }
+            ]
+        }
+        return {"mealPlan": fallback_plan}
 
 @app.post("/api/test-scenarios")
 def test_scenarios():

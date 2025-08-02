@@ -164,22 +164,23 @@ What specific area would you like to focus on today?
         """.strip()
     
     def is_greeting(self, message: str) -> bool:
-        """Check if message is a greeting"""
+        """Check if message is a standalone greeting"""
         message_lower = message.lower().strip()
-        
-        # Only consider it a greeting if it's a short message that starts with or is exactly a greeting
+
+        # Define accepted greeting patterns
         greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening']
-        
-        # Check if message is exactly a greeting or starts with a greeting
-        for greeting in greetings:
-            if message_lower == greeting or message_lower.startswith(greeting + ' '):
-                return True
-        
-        # Also check for very short messages that are clearly greetings
-        if len(message.split()) <= 3:
-            return any(greeting in message_lower for greeting in greetings)
-        
+
+        # Split message into words
+        words = message_lower.split()
+
+        # Only return True if the full message is exactly a greeting or has max 2-3 words that are all greeting-like
+        if len(words) <= 3:
+            joined = ' '.join(words)
+            return any(joined == greeting or joined.startswith(greeting + ' ') for greeting in greetings)
+
+        # If message is longer than 3 words, it's not just a greeting
         return False
+
     
     def get_greeting_response(self) -> str:
         """Get a friendly greeting response"""

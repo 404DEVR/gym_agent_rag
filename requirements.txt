@@ -8,4 +8,7 @@ python-dotenv
 pydantic
 PyMuPDF
 requests
-gunicorn 
+gunicorn
+flask
+flask-cors
+sentence-transformers 
