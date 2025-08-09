@@ -1490,8 +1490,10 @@ def fast_keyword_classifier(user_message):
     # Smart data-aware questions (check before plan creation)
     # Next workout questions
     if any(phrase in message_lower for phrase in [
-        "next workout", "today's workout", "workout today", "workout for today", 
-        "what workout today", "my workout today", "today workout", "workout plan for today"
+        "next workout", "today's workout", "workout today", "workout for today",
+        "what workout today", "my workout today", "today workout", "workout plan for today",
+        "what is my next workout", "what's my next workout", "whats my next workout",
+        "what do i train today", "which workout today", "what should i train today"
     ]):
         return {"intent": "smart_workout_query", "tools_to_use": ["get_next_workout"], "query_type": "today"}
     
@@ -1505,7 +1507,9 @@ def fast_keyword_classifier(user_message):
     # Next meal questions
     if any(phrase in message_lower for phrase in [
         "next meal", "what to eat next", "what should i eat", "meal now", "current meal",
-        "what to eat now", "next food", "what meal now", "meal for now"
+        "what to eat now", "next food", "what meal now", "meal for now",
+        "what is my next meal", "what's my next meal", "whats my next meal",
+        "what should i eat now", "what should i eat for next meal"
     ]):
         return {"intent": "smart_meal_query", "tools_to_use": ["get_next_meal"], "query_type": "next"}
     
@@ -1539,7 +1543,12 @@ def fast_keyword_classifier(user_message):
         return {"intent": "smart_workout_query", "tools_to_use": ["get_workout_schedule"], "query_type": "schedule"}
     
     # Nutrition/Meal plan requests - extract goal from prompt (check before profile questions)
-    nutrition_keywords = ["nutrition plan", "meal plan", "diet plan", "eating plan", "food plan", "create nutrition", "generate meal", "nutrition", "meal", "diet"]
+    # IMPORTANT: avoid generic words like "meal", "diet", "nutrition" to prevent false positives for smart meal queries
+    nutrition_keywords = [
+        "nutrition plan", "meal plan", "diet plan", "eating plan", "food plan",
+        "create nutrition plan", "generate meal plan", "create meal plan", "make meal plan",
+        "design meal plan", "generate diet plan", "create diet plan"
+    ]
     
     for keyword in nutrition_keywords:
         if keyword in message_lower:
@@ -2438,7 +2447,7 @@ Return ONLY the JSON, no additional text.
             workout_prompt,
             generation_config=genai.types.GenerationConfig(
                 max_output_tokens=2000,
-                temperature=0.3,  # Lower temperature for more consistent structure
+                temperature=0.6,  # Slightly higher for more variation while keeping structure
             )
         )
         
