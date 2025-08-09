@@ -345,4 +345,3 @@ if __name__ == "__main__":
         "diet": "vegetarian",
         "days": 4
     }
-    print(generate_plan(user))

@@ -13,7 +13,6 @@ def load_index_safely(index_path):
     try:
         return faiss.read_index(index_path)
     except:
-        print(f"Warning: Could not load {index_path}. Run 'python ingest.py' first.")
         return None
 
 workout_index = load_index_safely("data/workout.index")

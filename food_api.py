@@ -399,7 +399,6 @@ if __name__ == "__main__":
     client = EnhancedFoodAPIClient()
     
     # Test enhanced recipe search
-    print("Testing enhanced recipe search...")
     recipes = client.search_recipes_by_ingredients(
         ingredients=['chicken', 'rice', 'broccoli'],
         dietary_restrictions=['gluten-free'],
@@ -407,19 +406,11 @@ if __name__ == "__main__":
         max_results=3
     )
     
-    print(f"Found {len(recipes)} recipes")
-    for recipe in recipes:
-        print(f"- {recipe.name}: {recipe.nutrition.calories} cal, {recipe.nutrition.protein}g protein")
-    
     # Test detailed nutrition analysis
-    print("\nTesting nutrition analysis...")
     nutrition = client.analyze_nutrition_detailed(
         ingredients=['chicken breast', 'brown rice', 'broccoli'],
         quantities=['150g', '1 cup cooked', '1 cup']
     )
-    print(f"Nutrition: {nutrition.calories} cal, {nutrition.protein}g protein, {nutrition.carbs}g carbs")
     
     # Test legacy function
-    print("\nTesting legacy function...")
     suggestions = get_food_suggestions("high protein vegetarian")
-    print(f"Food suggestions: {suggestions}")

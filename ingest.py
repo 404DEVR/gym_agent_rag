@@ -41,8 +41,6 @@ def ingest_files(folder_path, index_name, txt_name):
             continue
             
         chunks = chunk_text(raw_text)
-        print(f"📄 Processing {file_name}: {len(chunks)} chunks")
-
         for chunk in chunks:
             try:
                 embedding = genai.embed_content(
@@ -52,7 +50,6 @@ def ingest_files(folder_path, index_name, txt_name):
                 embeddings.append(embedding)
                 texts.append(chunk)
             except Exception as e:
-                print(f"⚠️ Error processing chunk: {e}")
                 continue
 
     if embeddings:
@@ -63,19 +60,13 @@ def ingest_files(folder_path, index_name, txt_name):
         with open(f"data/{txt_name}", "w", encoding="utf-8") as f:
             for t in texts:
                 f.write(t + "\n")
-        print(f"✅ Created {index_name} with {len(texts)} chunks")
     else:
-        print(f"⚠️ No content found in {folder_path}")
+        pass
 
 if __name__ == "__main__":
-    # ✅ Create data directory if it doesn't exist
+    # Create data directory if it doesn't exist
     os.makedirs("data", exist_ok=True)
     
-    # ✅ Create 2 separate indexes
-    print("🔄 Processing workout files...")
+    # Create 2 separate indexes
     ingest_files("pdfs/workouts", "workout.index", "workout.txt")
-    
-    print("🔄 Processing nutrition files...")
-    ingest_files("pdfs/nutrition", "nutrition.index", "nutrition.txt")
-    
-    print("✅ Ingestion complete: workout.index & nutrition.index created.") 
+    ingest_files("pdfs/nutrition", "nutrition.index", "nutrition.txt") 

@@ -238,15 +238,63 @@ class NutritionPlanner:
 
     def generate_full_cooking_plan(self, target_calories, target_protein):
         """Generate comprehensive meal plan with full recipes"""
+        meals = {
+            "breakfast": {
+                "name": "Protein Pancakes",
+                "ingredients": self.full_cook_recipes["protein_pancakes"]["ingredients"],
+                "instructions": self.full_cook_recipes["protein_pancakes"]["instructions"],
+                "prep_time": self.full_cook_recipes["protein_pancakes"]["prep_time"],
+                "total_calories": self.full_cook_recipes["protein_pancakes"]["total_calories"],
+                "total_protein": self.full_cook_recipes["protein_pancakes"]["macros"]["protein"]
+            },
+            "lunch": {
+                "name": "Chicken Rice Bowl",
+                "ingredients": self.full_cook_recipes["chicken_rice_bowl"]["ingredients"],
+                "instructions": self.full_cook_recipes["chicken_rice_bowl"]["instructions"],
+                "prep_time": self.full_cook_recipes["chicken_rice_bowl"]["prep_time"],
+                "total_calories": self.full_cook_recipes["chicken_rice_bowl"]["total_calories"],
+                "total_protein": self.full_cook_recipes["chicken_rice_bowl"]["macros"]["protein"]
+            },
+            "dinner": {
+                "name": "Grilled Salmon with Quinoa",
+                "ingredients": [
+                    {"item": "salmon_fillet", "quantity": "150g", "calories": 280},
+                    {"item": "quinoa", "quantity": "60g_dry", "calories": 220},
+                    {"item": "asparagus", "quantity": "150g", "calories": 30},
+                    {"item": "olive_oil", "quantity": "1 tbsp", "calories": 119}
+                ],
+                "instructions": [
+                    "Cook quinoa according to package instructions",
+                    "Season salmon with herbs and spices",
+                    "Grill salmon for 4-5 minutes each side",
+                    "Steam asparagus until tender",
+                    "Serve salmon over quinoa with asparagus"
+                ],
+                "prep_time": "20 minutes",
+                "total_calories": 649,
+                "total_protein": 42
+            }
+        }
+        
+        # Calculate totals
+        total_daily_calories = sum(meal["total_calories"] for meal in meals.values())
+        total_daily_protein = sum(meal["total_protein"] for meal in meals.values())
+        
         return {
-            "breakfast": self.full_cook_recipes["protein_pancakes"],
-            "lunch": self.full_cook_recipes["chicken_rice_bowl"],
-            "meal_prep_strategy": [
+            "meals": meals,
+            "daily_totals": {
+                "calories": total_daily_calories,
+                "protein": total_daily_protein
+            },
+            "cooking_tips": [
                 "Sunday: Prep proteins for the week",
                 "Cook grains in bulk",
                 "Wash and chop all vegetables",
-                "Prepare 3-4 different sauces/seasonings"
-            ]
+                "Prepare 3-4 different sauces/seasonings",
+                "Invest in good non-stick pans",
+                "Use a food scale for accurate portions"
+            ],
+            "shopping_list": self._generate_shopping_list(meals)
         }
 
     def _generate_shopping_list(self, meals):
@@ -280,11 +328,5 @@ if __name__ == "__main__":
     
     # Test no-cook meal plan
     no_cook_plan = planner.generate_no_cook_meal_plan(2400, 150)
-    print("NO-COOK MEAL PLAN:")
-    print(f"Daily Calories: {no_cook_plan['daily_totals']['calories']}")
-    print(f"Daily Protein: {no_cook_plan['daily_totals']['protein']}g")
-    
-    for meal_name, meal_data in no_cook_plan['meals'].items():
-        print(f"\n{meal_name.upper()}: {meal_data['name']}")
-        print(f"Calories: {meal_data['total_calories']} | Protein: {meal_data['total_protein']}g")
-        print(f"Prep: {meal_data['prep_instructions']}")
+    # Test no-cook meal plan
+    no_cook_plan = planner.generate_no_cook_meal_plan(2400, 150)

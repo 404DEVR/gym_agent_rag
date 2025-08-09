@@ -1,0 +1,83 @@
+{
+  "test_user": {
+    "workout_plans": [
+      {
+        "goal": "muscle_gain",
+        "days": 4,
+        "split": [
+          "Push",
+          "Pull",
+          "Legs",
+          "Rest"
+        ],
+        "exercises": [
+          {
+            "day": "Push",
+            "exercises": [
+              {
+                "name": "Push-ups",
+                "sets": 3,
+                "reps": 10
+              }
+            ]
+          }
+        ],
+        "created_at": "2024-01-01T10:00:00"
+      }
+    ]
+  },
+  "test_user_123": {
+    "age": 25,
+    "weight": 75,
+    "height": 180,
+    "gender": "male",
+    "goal": "muscle_gain",
+    "activity": "moderate",
+    "workout_plans": [
+      {
+        "goal": "muscle_gain",
+        "days": 4,
+        "split": [
+          "Push",
+          "Pull",
+          "Legs",
+          "Rest"
+        ],
+        "exercises": [
+          {
+            "day_name": "Push Day",
+            "exercises": [
+              {
+                "name": "Push-ups",
+                "sets": 3,
+                "reps": 12
+              },
+              {
+                "name": "Bench Press",
+                "sets": 4,
+                "reps": 8
+              }
+            ]
+          }
+        ],
+        "created_at": "2024-01-15T10:00:00",
+        "action": "add"
+      }
+    ]
+  },
+  "52f27057-28d9-4b7d-b42b-a21f0e318775": {
+    "age": 21,
+    "weight": 86.0,
+    "height": 175.0,
+    "gender": "male",
+    "fitness_goal": "gain weight",
+    "goal": "gain weight",
+    "activity_level": "moderately_active",
+    "target_calories": 3373.0,
+    "target_protein": 253.0,
+    "target_carbs": 337.0,
+    "target_fat": 112.0,
+    "gym_access": true,
+    "created_at": "2025-08-09T16:29:50.340852"
+  }
+}
